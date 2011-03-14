@@ -10,3 +10,5 @@ pandoc.cabal.orig
 *.o
 *.hi
 
+/src/Text/Pandoc/Readers/Confluence.hs~
+/src/confluence2markdown.hs~
