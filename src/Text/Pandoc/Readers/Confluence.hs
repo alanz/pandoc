@@ -28,9 +28,21 @@ isElement _ = False
 
 data Confluence = StringData String
                 | Id Integer
+                | Property [(String,String)] [Confluence] -- attributes children
+                | Collection [(String,String)] [Confluence] -- attributes children
+                | CollectionElement [(String,String)] [Confluence] -- attributes children
                 | TempData Element
                 deriving (Show)
                          
+-- ---------------------------------------------------------------------
+
+flattenAttr a =
+  let
+    key = qName $ attrKey a
+    val = attrVal a
+  in
+   (key,val)
+
 -- ---------------------------------------------------------------------
 {-
 Elem (Element {elName = QName {qName = "id", qURI = Nothing, qPrefix = Nothing}, elAttribs = [Attr {attrKey = QName {qName = "name", qURI = Nothing, qPrefix = Nothing}, attrVal = "id"}], elContent = [Text (CData {cdVerbatim = CDataText, cdData = "5865479", cdLine = Just 3})], elLine = Just 3})
@@ -44,17 +56,46 @@ processId c =
     Id $ read val
 
 -- ---------------------------------------------------------------------
+-- Property always has name attr, may have class attr
 
-processProperty c = TempData c
+processProperty c = 
+  let
+    attribs = map flattenAttr $ elAttribs c
+    content = map processElement (elContent c)
+  in  
+    Property attribs content
+
+-- ---------------------------------------------------------------------
+
+processCollection c =
+  let
+    attribs = map flattenAttr $ elAttribs c
+    content = map processElement (elContent c)
+  in  
+    Collection attribs content
+
+-- ---------------------------------------------------------------------
+
+processElementTag c =
+  let
+    attribs = map flattenAttr $ elAttribs c
+    content = map processElement (elContent c)
+  in  
+    CollectionElement attribs content
 
 -- ---------------------------------------------------------------------
 
 processElement (Elem c) 
   | name == "id" = processId c
-  | name == "property" = processProperty c                   
+  | name == "property" = processProperty c
+  | name == "collection" = processCollection c
+  | name == "element" = processElementTag c
   | otherwise = StringData name                 
   where                
     name = qName (elName c)
+processElement (Text c) = StringData (cdData c)
+processElement x = StringData $ show x
+    
     
 -- ---------------------------------------------------------------------
 
