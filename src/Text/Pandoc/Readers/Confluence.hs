@@ -40,11 +40,10 @@ isElement _ = False
 
 data Confluence = StringData String
                 | Id Integer
-                -- | Property [(String,String)] [Confluence] -- attributes children
                 | Property String [Confluence] -- name children
-                -- | Collection [(String,String)] [Confluence] -- attributes children
                 | Collection String [Confluence] -- name children
-                | CollectionElement [(String,String)] [Confluence] -- attributes children
+                | CollectionElement String Confluence -- name id
+                | Properties (Map.Map String [Confluence]) -- map of property names to values
                 | TempData Element
                 deriving (Show)
                          
@@ -100,7 +99,7 @@ processElementTag c =
     attribs = map flattenAttr $ elAttribs c
     content = filter noEmptyStringData $ map processElement (elContent c)
   in  
-    CollectionElement attribs content
+    CollectionElement (snd $ head attribs) (head content)
 
 -- ---------------------------------------------------------------------
 
@@ -164,14 +163,31 @@ processXml cs =
   in  
     map processObject objects
 
+-- ---------------------------------------------------------------------
+
 --process :: [Content] -> [(String, String)]
 --process cs = map handleObject $ processXml cs
 process cs = 
   let
     (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
+    pages' = filter (\oid -> livePage m oid) pages
   in  
-    map (\oid -> m Map.! oid) pages
+    map (\oid -> m Map.! oid) pages'
 
+livePage :: Map.Map Integer (String,[Confluence]) -> Integer -> Bool
+livePage m oid =
+  let
+    (name,cs) = (m Map.! oid)
+    (Properties props) = head cs
+  in  
+    Map.notMember "originalVersion" props 
+        
+-- ---------------------------------------------------------------------
+
+buildStructure
+  :: (Map.Map Integer ([Char], [Confluence]), [Integer])
+     -> (t, Confluence, [Char], [Confluence])
+     -> (Map.Map Integer ([Char], [Confluence]), [Integer])
 buildStructure (m,pages) o = 
   let
     (name,Id idval,contents) = handleObject o
@@ -179,21 +195,62 @@ buildStructure (m,pages) o =
   in 
    (Map.insert idval (name,contents) m, pages')
 
+-- ---------------------------------------------------------------------
+
 --handleObject :: (String, Confluence, String, [Confluence]) -> (String, [Confluence])
-handleObject (_,oid,"Attachment",contents)              = ("Attachment",oid, contents)
-handleObject (_,oid,"BodyContent",contents)             = ("BodyContent",oid, contents)
-handleObject (_,oid,"BucketPropertySetItem",contents)   = ("BucketPropertySetItem",oid, contents)
-handleObject (_,oid,"ConfluenceBandanaRecord",contents) = ("ConfluenceBandanaRecord",oid, contents)
-handleObject (_,oid,"OutgoingLink",contents)            = ("OutgoingLink",oid, contents)
-handleObject (_,oid,"Page",contents)                    = ("Page",oid, contents)
-handleObject (_,oid,"Space",contents)                   = ("Space",oid, contents)
-handleObject (_,oid,"SpacePermission",contents)         = ("SpacePermission",oid, contents)
-handleObject (_,oid,"SpaceDescription",contents)        = ("SpaceDescription",oid, contents)
+handleObject (_,oid,"Attachment",contents)              = ("Attachment",oid, collectProperties contents)
+handleObject (_,oid,"BodyContent",contents)             = ("BodyContent",oid, collectProperties contents)
+handleObject (_,oid,"BucketPropertySetItem",contents)   = ("BucketPropertySetItem",oid, collectProperties contents)
+handleObject (_,oid,"ConfluenceBandanaRecord",contents) = ("ConfluenceBandanaRecord",oid, collectProperties contents)
+handleObject (_,oid,"OutgoingLink",contents)            = ("OutgoingLink",oid, collectProperties contents)
+handleObject (_,oid,"Page",contents)                    = ("Page",oid, collectProperties contents)
+handleObject (_,oid,"Space",contents)                   = ("Space",oid, collectProperties contents)
+handleObject (_,oid,"SpacePermission",contents)         = ("SpacePermission",oid, collectProperties contents)
+handleObject (_,oid,"SpaceDescription",contents)        = ("SpaceDescription",oid, collectProperties contents)
+
+-- ---------------------------------------------------------------------
+
+collectProperties :: [Confluence] -> [Confluence]
+collectProperties cs = 
+  let
+    (m,r) = foldl' gather (Map.empty,[]) cs
+  in
+   (Properties m):r
+  where
+    gather
+      :: (Map.Map String [Confluence], [Confluence])
+         -> Confluence
+         -> (Map.Map String [Confluence], [Confluence])
+    gather (m,others) (Property name rest) = (Map.insert name rest m,others) 
+    gather (m,others) c                    = (m,                     others++[c])     
+    
+
+    
 
 -- =====================================================================
 -- Testing support
 
 t = readConfluenceFile "tests/confluence-entities.xml"
+
+
+_page :: [Confluence]
+_page =   
+  [
+  Id 6914052,
+  Property "position" [],
+  Property "title" [StringData "Home"],
+  Collection "bodyContents" [CollectionElement "BodyContent" (Id 6979588)],
+  Property "version" [StringData "1"],
+  Property "creatorName" [StringData "alanz"],
+  Property "creationDate" [StringData "2011-03-14 20:25:24.676"],
+  Property "lastModifierName" [StringData "alanz"],
+  Property "lastModificationDate" [StringData "2011-03-14 20:25:24.676"],
+  Property "versionComment" [StringData ""],
+  Property "originalVersion" [Id 6914050],
+  Property "contentStatus" [StringData "current"]
+  ]
+  
+
 
 tXml :: [Content]
 tXml = parseXML _test_str
