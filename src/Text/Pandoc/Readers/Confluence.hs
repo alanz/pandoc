@@ -12,13 +12,25 @@ Conversion of Confluence export xml format Wiki  to 'Pandoc' document.
 module Text.Pandoc.Readers.Confluence ( readConfluence
                                       ) where
 
+import qualified Data.Map as Map
 import Text.XML.Light.Input
 import Text.XML.Light.Types
 import Text.Pandoc.Builder
 
+import Data.List (foldl')
+
 
 readConfluence = undefined
 
+
+-- e.g. readConfluenceFile "tests/confluence-entities.xml"
+--readConfluenceFile
+--  :: FilePath -> IO [(String, String, [Confluence])]
+readConfluenceFile filename =
+  do 
+     x <- readFile (filename)
+     return $ process $ parseXML x
+     
 -- ---------------------------------------------------------------------
 
 isElement (Elem x) = True
@@ -28,14 +40,17 @@ isElement _ = False
 
 data Confluence = StringData String
                 | Id Integer
-                | Property [(String,String)] [Confluence] -- attributes children
-                | Collection [(String,String)] [Confluence] -- attributes children
+                -- | Property [(String,String)] [Confluence] -- attributes children
+                | Property String [Confluence] -- name children
+                -- | Collection [(String,String)] [Confluence] -- attributes children
+                | Collection String [Confluence] -- name children
                 | CollectionElement [(String,String)] [Confluence] -- attributes children
                 | TempData Element
                 deriving (Show)
                          
 -- ---------------------------------------------------------------------
 
+flattenAttr :: Text.XML.Light.Types.Attr -> (String, String)
 flattenAttr a =
   let
     key = qName $ attrKey a
@@ -48,6 +63,7 @@ flattenAttr a =
 Elem (Element {elName = QName {qName = "id", qURI = Nothing, qPrefix = Nothing}, elAttribs = [Attr {attrKey = QName {qName = "name", qURI = Nothing, qPrefix = Nothing}, attrVal = "id"}], elContent = [Text (CData {cdVerbatim = CDataText, cdData = "5865479", cdLine = Just 3})], elLine = Just 3})
 -}
 
+processId :: Element -> Confluence
 processId c =
   let
     (Text content) = head (elContent c)
@@ -58,33 +74,37 @@ processId c =
 -- ---------------------------------------------------------------------
 -- Property always has name attr, may have class attr
 
+processProperty :: Element -> Confluence
 processProperty c = 
   let
     attribs = map flattenAttr $ elAttribs c
-    content = map processElement (elContent c)
+    content = filter noEmptyStringData $ map processElement (elContent c)
   in  
-    Property attribs content
+    Property (snd $ head attribs) content
 
 -- ---------------------------------------------------------------------
-
+-- Collection has name and class, which identifies the java class.
+processCollection :: Element -> Confluence
 processCollection c =
   let
     attribs = map flattenAttr $ elAttribs c
-    content = map processElement (elContent c)
+    content = filter noEmptyStringData $ map processElement (elContent c)
   in  
-    Collection attribs content
+    Collection (snd $ head attribs) content
 
 -- ---------------------------------------------------------------------
 
+processElementTag :: Element -> Confluence
 processElementTag c =
   let
     attribs = map flattenAttr $ elAttribs c
-    content = map processElement (elContent c)
+    content = filter noEmptyStringData $ map processElement (elContent c)
   in  
     CollectionElement attribs content
 
 -- ---------------------------------------------------------------------
 
+processElement :: Content -> Confluence
 processElement (Elem c) 
   | name == "id" = processId c
   | name == "property" = processProperty c
@@ -98,27 +118,82 @@ processElement x = StringData $ show x
     
     
 -- ---------------------------------------------------------------------
+{- Note: there are also composite ids. ignoring for now.
 
+Example:
+<composite-id><property name="entityName" type="string"><![CDATA[confluence_ContentEntityObject]]></property>
+<property name="entityId" type="long">6914050</property>
+<property name="key" type="string"><![CDATA[socialbookmarkingurl]]></property>
+</composite-id>
+-}
+
+getId :: [Confluence] -> Confluence
+getId cs = 
+  let
+    idList = dropWhile notId cs
+  in  
+    idOrNone idList
+  where
+    notId (Id x) = False
+    notId _      = True
+    
+    idOrNone [] = Id (-1)
+    idOrNone xs = head xs
+  
+-- ---------------------------------------------------------------------
+
+noEmptyStringData (StringData "\n") = False
+noEmptyStringData _ = True
+
+processObject :: Content -> (String, Confluence, String, [Confluence])
 processObject (Elem c) = 
   let
-    -- (QName qname) = elName c
-    -- name = qName qname
     name = qName (elName c)
     attribs = attrVal $ head (elAttribs c)
-    content = map processElement (elContent c)
+    content = filter noEmptyStringData $ map processElement (elContent c)
+    oid = getId content
   in  
-   (name, attribs, content)
+   (name, oid, attribs, content)
 
 --process :: [Content] -> [Content]
-process cs = 
+processXml :: [Content] -> [(String, Confluence, String, [Confluence])]
+processXml cs = 
   let
     (Elem root) = head $ tail $ filter isElement cs
     objects = filter isElement $ elContent root
   in  
     map processObject objects
 
+--process :: [Content] -> [(String, String)]
+--process cs = map handleObject $ processXml cs
+process cs = 
+  let
+    (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
+  in  
+    map (\oid -> m Map.! oid) pages
+
+buildStructure (m,pages) o = 
+  let
+    (name,Id idval,contents) = handleObject o
+    pages' = if (name == "Page") then idval:pages else pages
+  in 
+   (Map.insert idval (name,contents) m, pages')
+
+--handleObject :: (String, Confluence, String, [Confluence]) -> (String, [Confluence])
+handleObject (_,oid,"Attachment",contents)              = ("Attachment",oid, contents)
+handleObject (_,oid,"BodyContent",contents)             = ("BodyContent",oid, contents)
+handleObject (_,oid,"BucketPropertySetItem",contents)   = ("BucketPropertySetItem",oid, contents)
+handleObject (_,oid,"ConfluenceBandanaRecord",contents) = ("ConfluenceBandanaRecord",oid, contents)
+handleObject (_,oid,"OutgoingLink",contents)            = ("OutgoingLink",oid, contents)
+handleObject (_,oid,"Page",contents)                    = ("Page",oid, contents)
+handleObject (_,oid,"Space",contents)                   = ("Space",oid, contents)
+handleObject (_,oid,"SpacePermission",contents)         = ("SpacePermission",oid, contents)
+handleObject (_,oid,"SpaceDescription",contents)        = ("SpaceDescription",oid, contents)
+
 -- =====================================================================
 -- Testing support
+
+t = readConfluenceFile "tests/confluence-entities.xml"
 
 tXml :: [Content]
 tXml = parseXML _test_str
