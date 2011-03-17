@@ -44,6 +44,7 @@ data Confluence = StringData String
                 | Collection String [Confluence] -- name children
                 | CollectionElement String Confluence -- name id
                 | Properties (Map.Map String [Confluence]) -- map of property names to values
+                | Collections (Map.Map String [Confluence]) -- map of collection names to values
                 | TempData Element
                 deriving (Show)
                          
@@ -165,14 +166,37 @@ processXml cs =
 
 -- ---------------------------------------------------------------------
 
+renderBody m (_,(Properties props:Collections collections:rest)) = 
+  let
+    [StringData body] = props Map.! "body"
+  in
+    body
+
+-- ---------------------------------------------------------------------
+
+renderPage m (_,(Properties props:Collections collections:rest)) = 
+  let
+    [StringData title] = props Map.! "title"
+    [CollectionElement _ (Id bcid)] = collections Map.! "bodyContents"
+    bc = m Map.! bcid
+  in
+    (title,renderBody m bc)
+    -- (title,bc)
+
+-- ---------------------------------------------------------------------
+
 --process :: [Content] -> [(String, String)]
 --process cs = map handleObject $ processXml cs
+--process :: [Content] -> [(String, [Confluence])]
 process cs = 
   let
     (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
     pages' = filter (\oid -> livePage m oid) pages
   in  
-    map (\oid -> m Map.! oid) pages'
+    map (renderPage m) $ map (\oid -> m Map.! oid) pages'
+    --map (\oid -> m Map.! oid) pages'
+
+-- ---------------------------------------------------------------------
 
 livePage :: Map.Map Integer (String,[Confluence]) -> Integer -> Bool
 livePage m oid =
@@ -198,31 +222,32 @@ buildStructure (m,pages) o =
 -- ---------------------------------------------------------------------
 
 --handleObject :: (String, Confluence, String, [Confluence]) -> (String, [Confluence])
-handleObject (_,oid,"Attachment",contents)              = ("Attachment",oid, collectProperties contents)
-handleObject (_,oid,"BodyContent",contents)             = ("BodyContent",oid, collectProperties contents)
-handleObject (_,oid,"BucketPropertySetItem",contents)   = ("BucketPropertySetItem",oid, collectProperties contents)
-handleObject (_,oid,"ConfluenceBandanaRecord",contents) = ("ConfluenceBandanaRecord",oid, collectProperties contents)
-handleObject (_,oid,"OutgoingLink",contents)            = ("OutgoingLink",oid, collectProperties contents)
-handleObject (_,oid,"Page",contents)                    = ("Page",oid, collectProperties contents)
-handleObject (_,oid,"Space",contents)                   = ("Space",oid, collectProperties contents)
-handleObject (_,oid,"SpacePermission",contents)         = ("SpacePermission",oid, collectProperties contents)
-handleObject (_,oid,"SpaceDescription",contents)        = ("SpaceDescription",oid, collectProperties contents)
+handleObject (_,oid,"Attachment",contents)              = ("Attachment",oid, collectNames contents)
+handleObject (_,oid,"BodyContent",contents)             = ("BodyContent",oid, collectNames contents)
+handleObject (_,oid,"BucketPropertySetItem",contents)   = ("BucketPropertySetItem",oid, collectNames contents)
+handleObject (_,oid,"ConfluenceBandanaRecord",contents) = ("ConfluenceBandanaRecord",oid, collectNames contents)
+handleObject (_,oid,"OutgoingLink",contents)            = ("OutgoingLink",oid, collectNames contents)
+handleObject (_,oid,"Page",contents)                    = ("Page",oid, collectNames contents)
+handleObject (_,oid,"Space",contents)                   = ("Space",oid, collectNames contents)
+handleObject (_,oid,"SpacePermission",contents)         = ("SpacePermission",oid, collectNames contents)
+handleObject (_,oid,"SpaceDescription",contents)        = ("SpaceDescription",oid, collectNames contents)
 
 -- ---------------------------------------------------------------------
 
-collectProperties :: [Confluence] -> [Confluence]
-collectProperties cs = 
+collectNames :: [Confluence] -> [Confluence]
+collectNames cs = 
   let
-    (m,r) = foldl' gather (Map.empty,[]) cs
+    (m,cm,r) = foldl' gather (Map.empty,Map.empty,[]) cs
   in
-   (Properties m):r
+   (Properties m):(Collections cm):r
   where
     gather
-      :: (Map.Map String [Confluence], [Confluence])
+      :: (Map.Map String [Confluence], Map.Map String [Confluence], [Confluence])
          -> Confluence
-         -> (Map.Map String [Confluence], [Confluence])
-    gather (m,others) (Property name rest) = (Map.insert name rest m,others) 
-    gather (m,others) c                    = (m,                     others++[c])     
+         -> (Map.Map String [Confluence], Map.Map String [Confluence], [Confluence])
+    gather (m,cm,others) (Property name rest)   = (Map.insert name rest m,cm,others) 
+    gather (m,cm,others) (Collection name rest) = (m,Map.insert name rest cm,others) 
+    gather (m,cm,others) c                      = (m,                     cm,others++[c])     
     
 
     
