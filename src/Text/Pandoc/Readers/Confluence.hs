@@ -17,8 +17,9 @@ import Text.XML.Light.Input
 import Text.XML.Light.Types
 import Text.Pandoc.Builder
 
-import Data.List (foldl')
+import Data.List (foldl', sort)
 
+-- ---------------------------------------------------------------------
 
 readConfluence = undefined
 
@@ -185,6 +186,23 @@ renderPage m (_,(Properties props:Collections collections:rest)) =
 
 -- ---------------------------------------------------------------------
 
+extractDates (-1) _ = ("","","",-1) 
+extractDates oid (_,(Properties props:Collections collections:rest)) = 
+  let
+    [StringData creationDate]         = Map.findWithDefault [(StringData "")] "creationDate" props
+    [StringData lastModificationDate] = Map.findWithDefault [(StringData "")] "lastModificationDate" props
+    [StringData lastModifierName]     = Map.findWithDefault [(StringData "")] "lastModifierName" props
+  in
+    (lastModificationDate,lastModifierName,creationDate,oid)
+
+-- ---------------------------------------------------------------------
+
+groupByChangeSet m r@(lastModificationDate,lastModifierName,creationDate,oid)
+  | Map.member lastModificationDate m = Map.insert lastModificationDate (r:(m Map.! lastModificationDate)) m
+  | otherwise                         = Map.insert lastModificationDate [r] m
+
+-- ---------------------------------------------------------------------
+
 --process :: [Content] -> [(String, String)]
 --process cs = map handleObject $ processXml cs
 --process :: [Content] -> [(String, [Confluence])]
@@ -193,8 +211,9 @@ process cs =
     (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
     pages' = filter (\oid -> livePage m oid) pages
   in  
-    map (renderPage m) $ map (\oid -> m Map.! oid) pages'
+    --map (renderPage m) $ map (\oid -> m Map.! oid) pages'
     --map (\oid -> m Map.! oid) pages'
+    foldl' groupByChangeSet Map.empty $ sort $ map (\(k,v) -> extractDates k v) $ Map.toList m
 
 -- ---------------------------------------------------------------------
 
