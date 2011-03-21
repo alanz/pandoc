@@ -12,25 +12,25 @@ Conversion of Confluence export xml format Wiki  to 'Pandoc' document.
 module Text.Pandoc.Readers.Confluence ( readConfluence
                                       ) where
 
-import qualified Data.Map as Map
+import Data.List (foldl', sort)
+import Lib.Git
+import System.Directory
+import Text.Pandoc.Builder
 import Text.XML.Light.Input
 import Text.XML.Light.Types
-import Text.Pandoc.Builder
-
-import Data.List (foldl', sort)
+import qualified Data.Map as Map
 
 -- ---------------------------------------------------------------------
 
 readConfluence = undefined
 
-
 -- e.g. readConfluenceFile "tests/confluence-entities.xml"
---readConfluenceFile
---  :: FilePath -> IO [(String, String, [Confluence])]
 readConfluenceFile filename =
   do 
      x <- readFile (filename)
-     return $ process $ parseXML x
+     let changes = doProcess $ parseXML x
+     makeGitVersion changes "/tmp/flub"    
+     return changes    
      
 -- ---------------------------------------------------------------------
 
@@ -49,6 +49,40 @@ data Confluence = StringData String
                 | TempData Element
                 deriving (Show)
                          
+data Change = ChSpace | ChPage | ChAttachment | ChOther
+              deriving (Eq,Show)
+                       
+-- ---------------------------------------------------------------------
+
+generateFile :: [Char] -> (Change, [Char], String) -> IO ()
+generateFile path (ChPage,filename,body) = 
+  do
+    writeFile (path ++ "/" ++ filename ++ ".textile") body
+    return ()
+
+generateFile path change = do return ()
+ 
+-- ---------------------------------------------------------------------
+
+doOneGitChange :: [Char] -> [(Change, [Char], String)] -> IO [()]
+doOneGitChange path changeSet = mapM (generateFile path) changeSet
+  
+-- ---------------------------------------------------------------------
+
+--makeGitVersion :: (Num b) => [[(Change, [Char], [Char])]] -> [Char] -> IO b
+makeGitVersion changes path = 
+  do
+    let gitDir = path ++ "/.git"
+    createDirectoryIfMissing True path
+    createDirectoryIfMissing True gitDir
+    
+    let cfg = makeConfig gitDir Nothing
+    runGit cfg initDB
+    
+    mapM (doOneGitChange path) changes
+
+    return ()
+    
 -- ---------------------------------------------------------------------
 
 flattenAttr :: Text.XML.Light.Types.Attr -> (String, String)
@@ -57,7 +91,7 @@ flattenAttr a =
     key = qName $ attrKey a
     val = attrVal a
   in
-   (key,val)
+    (key,val)
 
 -- ---------------------------------------------------------------------
 {-
@@ -182,7 +216,6 @@ renderPage m (_,(Properties props:Collections collections:rest)) =
     bc = m Map.! bcid
   in
     (title,renderBody m bc)
-    -- (title,bc)
 
 -- ---------------------------------------------------------------------
 
@@ -197,24 +230,114 @@ extractDates oid (_,(Properties props:Collections collections:rest)) =
 
 -- ---------------------------------------------------------------------
 
+groupByChangeSet m r@("",_,_,_) = m
 groupByChangeSet m r@(lastModificationDate,lastModifierName,creationDate,oid)
   | Map.member lastModificationDate m = Map.insert lastModificationDate (r:(m Map.! lastModificationDate)) m
   | otherwise                         = Map.insert lastModificationDate [r] m
 
 -- ---------------------------------------------------------------------
 
---process :: [Content] -> [(String, String)]
---process cs = map handleObject $ processXml cs
---process :: [Content] -> [(String, [Confluence])]
-process cs = 
+getProp k m = val
+  where
+    [(StringData val)] = m Map.! k
+
+-- ---------------------------------------------------------------------
+    
+renderObject m "SpaceDescription" props collections rest = (ChOther, "", "SpaceDescription:ignore")
+{-
+  [Properties (fromList 
+    [
+    ("creationDate",[StringData "2011-03-14 20:25:24.056"]),
+    ("creatorName",[StringData "alanz"]),
+    ("description",[Id 6914049]),
+    ("homePage",[Id 6914050]),
+    ("key",[StringData "PLAY1"]),
+    ("lastModificationDate",[StringData "2011-03-14 20:25:24.056"]),
+    ("lastModifierName",[StringData "alanz"]),
+    ("name",[StringData "Play"]),
+    ("spaceType",[StringData "global"])]),
+-}
+renderObject m "Space" props collections rest = 
+  let
+    key = (getProp "key" props)
+    name = (getProp "name" props)  
+  in    
+    (ChSpace, key ++ ":" ++ name, "Space:" ++ key ++ ":" ++ name)
+
+renderObject m "SpacePermission" props collections rest = (ChOther, "","SpacePermission:ignore")
+
+renderObject m "Page" props collections rest = 
+  let
+    title = (getProp "title" props)
+    -- "position" property? Empty list.
+    -- [CollectionElement "bodyContent" (Id bodyId)] = collections Map.! "bodyContents"
+    [CollectionElement _ (Id bodyId)] = collections Map.! "bodyContents"
+    
+    pageBody = renderBody m (m Map.! bodyId)
+    
+  in         
+    (ChPage, title,show(pageBody))
+
+renderObject m name props collections rest = (ChOther, name,name)
+
+-- ---------------------------------------------------------------------
+{-
+  ("contentStatus",[StringData "current"]),
+  ("creationDate",[StringData "2011-03-14 20:25:24.676"]),
+  ("creatorName",[StringData "alanz"]),
+  ("lastModificationDate",[StringData "2011-03-14 20:25:24.676"]),
+  ("lastModifierName",[StringData "alanz"]),
+  ("originalVersion",[Id 6914050]),
+  ("version",[StringData "1"]),
+  ("versionComment",[StringData ""])
+-}
+
+getVersionInfo props =
+  let
+    contentStatus        = getProp "contentStatus" props
+    creationDate         = getProp "creationDate" props
+    creatorName          = getProp "creatorName" props
+    lastModificationDate = getProp "lastModificationDate" props
+    lastModifierName     = getProp "lastModifierName" props
+    originalVersion      = getProp "originalVersion" props
+    version              = getProp "version" props
+    versionComment       = getProp "versionComment" props
+  in    
+    (lastModifierName,versionComment,lastModificationDate ++ version)
+    
+-- ---------------------------------------------------------------------
+
+renderOid m oid = 
+  let
+    (name, (Properties props:Collections collections:rest)) = m Map.! oid
+    
+  in  
+   --(oid,renderObject m name props collections rest)
+   renderObject m name props collections rest
+
+-- ---------------------------------------------------------------------
+
+generateChange m changes key =
+  let
+    changeset = changes Map.! key
+    changeIds = map (\(_,_,_,oid) -> oid) changeset
+  in  
+    filter (\(chType,filename,body) -> filename /= "") $ map (renderOid m) changeIds
+
+-- ---------------------------------------------------------------------
+
+doProcess :: [Content] -> [[(Change, [Char], [Char])]]
+doProcess cs = 
   let
     (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
     pages' = filter (\oid -> livePage m oid) pages
+    changes = foldl' groupByChangeSet Map.empty $ map (\(k,v) -> extractDates k v) $ Map.toList m
+    res = filter (\xs -> xs /= []) $ map (generateChange m changes) $ Map.keys changes
   in  
     --map (renderPage m) $ map (\oid -> m Map.! oid) pages'
     --map (\oid -> m Map.! oid) pages'
-    foldl' groupByChangeSet Map.empty $ sort $ map (\(k,v) -> extractDates k v) $ Map.toList m
-
+    res
+    
 -- ---------------------------------------------------------------------
 
 livePage :: Map.Map Integer (String,[Confluence]) -> Integer -> Bool
