@@ -12,9 +12,12 @@ Conversion of Confluence export xml format Wiki  to 'Pandoc' document.
 module Text.Pandoc.Readers.Confluence ( readConfluence
                                       ) where
 
+import Data.Foldable (foldlM)
 import Data.List (foldl', sort)
 import Lib.Git
 import System.Directory
+import System.IO
+import Control.Exception
 import Text.Pandoc.Builder
 import Text.XML.Light.Input
 import Text.XML.Light.Types
@@ -54,32 +57,48 @@ data Change = ChSpace | ChPage | ChAttachment | ChOther
                        
 -- ---------------------------------------------------------------------
 
-generateFile :: [Char] -> (Change, [Char], String) -> IO ()
-generateFile path (ChPage,filename,body) = 
+unescapeStr :: String -> String
+unescapeStr str = read str
+
+-- ---------------------------------------------------------------------
+
+--generateFile :: [Char] -> (Change, [Char], String) -> IO ()
+generateFile :: Config -> String -> (Change, String, String) -> IO ()
+generateFile cfg path (ChPage,filename,body) = 
   do
-    writeFile (path ++ "/" ++ filename ++ ".textile") body
+    let fullfilename = path ++ "/" ++ filename ++ ".textile"
+    writeFile fullfilename (unescapeStr body)
+    runGit cfg (add [fullfilename])
     return ()
 
-generateFile path change = do return ()
+
+generateFile cfg path change = do return ()
  
 -- ---------------------------------------------------------------------
 
-doOneGitChange :: [Char] -> [(Change, [Char], String)] -> IO [()]
-doOneGitChange path changeSet = mapM (generateFile path) changeSet
+doOneGitChange
+  :: Config -> String -> [(Change, String, String)] -> IO [()]
+doOneGitChange cfg path changeSet = 
+  do
+    mapM (generateFile cfg path) changeSet
+    let author = "author"
+        author_email = "author_email"   
+        logmsg = "*logmsg*"
+    runGit cfg (commit [] author author_email logmsg)
+    
+    return [()]
   
 -- ---------------------------------------------------------------------
 
---makeGitVersion :: (Num b) => [[(Change, [Char], [Char])]] -> [Char] -> IO b
+makeGitVersion :: [[(Change, String, String)]] -> FilePath -> IO ()
 makeGitVersion changes path = 
   do
-    let gitDir = path ++ "/.git"
     createDirectoryIfMissing True path
-    createDirectoryIfMissing True gitDir
     
-    let cfg = makeConfig gitDir Nothing
-    runGit cfg initDB
+    let cfg = makeConfig path Nothing
+    runGit cfg (initDB False)
     
-    mapM (doOneGitChange path) changes
+    mapM (doOneGitChange cfg path) changes
 
     return ()
     
@@ -141,11 +160,11 @@ processElementTag c =
 
 processElement :: Content -> Confluence
 processElement (Elem c) 
-  | name == "id" = processId c
-  | name == "property" = processProperty c
+  | name == "id"         = processId c
+  | name == "property"   = processProperty c
   | name == "collection" = processCollection c
-  | name == "element" = processElementTag c
-  | otherwise = StringData name                 
+  | name == "element"    = processElementTag c
+  | otherwise            = StringData name            
   where                
     name = qName (elName c)
 processElement (Text c) = StringData (cdData c)
