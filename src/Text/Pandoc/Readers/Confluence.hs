@@ -62,29 +62,43 @@ unescapeStr str = read str
 
 -- ---------------------------------------------------------------------
 
---generateFile :: [Char] -> (Change, [Char], String) -> IO ()
-generateFile :: Config -> String -> (Change, String, String) -> IO ()
+--generateFile :: Config -> String -> (Change, String, String) -> IO ()
+generateFile :: Config -> String -> (Change, String, String) -> IO Bool
 generateFile cfg path (ChPage,filename,body) = 
   do
     let fullfilename = path ++ "/" ++ filename ++ ".textile"
     writeFile fullfilename (unescapeStr body)
     runGit cfg (add [fullfilename])
-    return ()
+    return True
 
-
-generateFile cfg path change = do return ()
+generateFile cfg path change = do return False
  
+-- ---------------------------------------------------------------------
+
+foldGenerateFile cfg path acc change =
+  do
+    doCommit <- generateFile cfg path change
+    return (doCommit || acc)
+
+-- ---------------------------------------------------------------------
+    
+commitIfNecessary :: (Monad m) => Bool -> m a -> m ()
+commitIfNecessary True cmd   = do cmd; return ()    
+commitIfNecessary False _cmd =         return ()
+
 -- ---------------------------------------------------------------------
 
 doOneGitChange
   :: Config -> String -> [(Change, String, String)] -> IO [()]
 doOneGitChange cfg path changeSet = 
   do
-    mapM (generateFile cfg path) changeSet
-    let author = "author"
-        author_email = "author_email"   
+    -- mapM (generateFile cfg path)  changeSet
+    doCommit <- foldlM (foldGenerateFile cfg path) False changeSet
+    let author = "A U Thor"
+        author_email = "author@example.com"
         logmsg = "*logmsg*"
-    runGit cfg (commit [] author author_email logmsg)
+    -- runGit cfg (commit [] author author_email logmsg)
+    commitIfNecessary doCommit (runGit cfg (commit [] author author_email logmsg))
     
     return [()]
   
