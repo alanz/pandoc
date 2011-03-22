@@ -12,15 +12,18 @@ Conversion of Confluence export xml format Wiki  to 'Pandoc' document.
 module Text.Pandoc.Readers.Confluence ( readConfluence
                                       ) where
 
+import Codec.Archive.Zip
+import Control.Applicative ( (<$>) )
+import Control.Monad
 import Data.Foldable (foldlM)
 import Data.List (foldl', sort)
 import Lib.Git
 import System.Directory
 import System.IO
-import Control.Exception
 import Text.Pandoc.Builder
 import Text.XML.Light.Input
 import Text.XML.Light.Types
+import qualified Data.ByteString.Lazy as B
 import qualified Data.Map as Map
 
 -- ---------------------------------------------------------------------
@@ -30,12 +33,44 @@ readConfluence = undefined
 -- e.g. readConfluenceFile "tests/confluence-entities.xml"
 readConfluenceFile filename =
   do 
-     x <- readFile (filename)
-     let changes = doProcess $ parseXML x
-     makeGitVersion changes "/tmp/flub"    
-     return changes    
+    x <- readFile (filename)
+    let changes = doProcess $ parseXML x
+    makeGitVersion changes "/tmp/flub"    
+    return changes    
      
+-- e.g. readConfluenceZip "tests/CONFLUENCE.zip"
+readConfluenceZip filename =
+  do 
+    exists <- doesFileExist filename
+    archive <- toArchive <$> B.readFile filename
+    let changes = doProcess $ parseXML $ getFileFromArchive archive "entities.xml"
+    makeGitVersion changes "/tmp/flub"    
+    return changes    
+
 -- ---------------------------------------------------------------------
+
+getFileFromArchive :: Archive -> FilePath -> B.ByteString
+getFileFromArchive archive filepath = 
+    case (findEntryByPath filepath archive) of
+      Just entry -> fromEntry entry
+      _          -> B.empty
+
+-- ---------------------------------------------------------------------
+      
+notDoesDirectoryExist path = do
+  x <- doesDirectoryExist path
+  case (x) of
+    True -> return False
+    False -> return True
+      
+--makeCleanFilePath :: [Char] -> IO FilePath
+--makeCleanFilePath path = do liftM head $ filterM (\p -> doesDirectoryExist p) candidatePaths
+makeCleanFilePath path = filterM (\p -> notDoesDirectoryExist p) candidatePaths
+  where
+    candidatePaths = map (path++) ([""] ++ ( map ("."++) $ map show [1..] ))
+  
+-- ---------------------------------------------------------------------
+      
 
 isElement (Elem x) = True
 isElement _ = False
@@ -98,7 +133,7 @@ doOneGitChange cfg path changeSet =
         author_email = "author@example.com"
         logmsg = "*logmsg*"
     -- runGit cfg (commit [] author author_email logmsg)
-    commitIfNecessary doCommit (runGit cfg (commit [] author author_email logmsg))
+    commitIfNecessary doCommit (runGit cfg (commit [] author author_email logmsg []))
     
     return [()]
   
@@ -431,6 +466,8 @@ collectNames cs =
 -- Testing support
 
 t = readConfluenceFile "tests/confluence-entities.xml"
+
+z = readConfluenceZip "/home/alanz/tmp/PLAY1-203424-2.xml.zip"
 
 
 _page :: [Confluence]
