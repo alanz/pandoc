@@ -31,6 +31,9 @@ import qualified Data.Map as Map
 readConfluence = undefined
 
 -- e.g. readConfluenceFile "tests/confluence-entities.xml"
+readConfluenceFile
+  :: FilePath
+     -> IO [(VersionInfo, [(ChangeType, [Char], [Char])])]
 readConfluenceFile filename =
   do 
     x <- readFile (filename)
@@ -39,6 +42,9 @@ readConfluenceFile filename =
     return changes    
      
 -- e.g. readConfluenceZip "tests/CONFLUENCE.zip"
+readConfluenceZip
+  :: FilePath
+     -> IO [(VersionInfo, [(ChangeType, [Char], [Char])])]
 readConfluenceZip filename =
   do 
     exists <- doesFileExist filename
@@ -57,21 +63,22 @@ getFileFromArchive archive filepath =
 
 -- ---------------------------------------------------------------------
       
+notDoesDirectoryExist :: FilePath -> IO Bool
 notDoesDirectoryExist path = do
   x <- doesDirectoryExist path
   case (x) of
     True -> return False
     False -> return True
       
---makeCleanFilePath :: [Char] -> IO FilePath
---makeCleanFilePath path = do liftM head $ filterM (\p -> doesDirectoryExist p) candidatePaths
-makeCleanFilePath path = filterM (\p -> notDoesDirectoryExist p) candidatePaths
+makeCleanFilePath :: [Char] -> IO FilePath
+makeCleanFilePath path = do liftM head $ filterM (\p -> notDoesDirectoryExist p) candidatePaths
   where
-    candidatePaths = map (path++) ([""] ++ ( map ("."++) $ map show [1..] ))
+    candidatePaths = map (path++) ([""] ++ ( map ("."++) $ map show [1..10] ))
   
 -- ---------------------------------------------------------------------
       
 
+isElement :: Content -> Bool
 isElement (Elem x) = True
 isElement _ = False
 
@@ -87,9 +94,18 @@ data Confluence = StringData String
                 | TempData Element
                 deriving (Show)
                          
-data Change = ChSpace | ChPage | ChAttachment | ChOther
+data ChangeType = ChSpace | ChPage | ChAttachment | ChOther
               deriving (Eq,Show)
                        
+type Change = (ChangeType,  
+               String,  -- filename
+               String)  -- body
+
+type VersionInfo = (String, -- committer
+                    String, -- commit date
+                    String, -- message
+                    String) -- version id
+
 -- ---------------------------------------------------------------------
 
 unescapeStr :: String -> String
@@ -97,8 +113,8 @@ unescapeStr str = read str
 
 -- ---------------------------------------------------------------------
 
---generateFile :: Config -> String -> (Change, String, String) -> IO ()
-generateFile :: Config -> String -> (Change, String, String) -> IO Bool
+--generateFile :: Config -> String -> (ChangeType, String, String) -> IO ()
+generateFile :: Config -> String -> (ChangeType, String, String) -> IO Bool
 generateFile cfg path (ChPage,filename,body) = 
   do
     let fullfilename = path ++ "/" ++ filename ++ ".textile"
@@ -110,6 +126,8 @@ generateFile cfg path change = do return False
  
 -- ---------------------------------------------------------------------
 
+foldGenerateFile
+  :: Config -> String -> Bool -> (ChangeType, String, String) -> IO Bool
 foldGenerateFile cfg path acc change =
   do
     doCommit <- generateFile cfg path change
@@ -124,22 +142,19 @@ commitIfNecessary False _cmd =         return ()
 -- ---------------------------------------------------------------------
 
 doOneGitChange
-  :: Config -> String -> [(Change, String, String)] -> IO [()]
-doOneGitChange cfg path changeSet = 
+  :: Config -> String -> (VersionInfo,[(ChangeType, String, String)]) -> IO [()]
+doOneGitChange cfg path (version,changeSet) = 
   do
-    -- mapM (generateFile cfg path)  changeSet
     doCommit <- foldlM (foldGenerateFile cfg path) False changeSet
-    let author = "A U Thor"
-        author_email = "author@example.com"
-        logmsg = "*logmsg*"
-    -- runGit cfg (commit [] author author_email logmsg)
-    commitIfNecessary doCommit (runGit cfg (commit [] author author_email logmsg []))
+    let author_email = "author@example.com"
+    let (author,date,logmsg,versionid) = version    
+    commitIfNecessary doCommit (runGit cfg (commit [] author author_email (logmsg++versionid) ["--date",date]))
     
     return [()]
   
 -- ---------------------------------------------------------------------
 
-makeGitVersion :: [[(Change, String, String)]] -> FilePath -> IO ()
+makeGitVersion :: [(VersionInfo,[Change])] -> FilePath -> IO ()
 makeGitVersion changes path = 
   do
     createDirectoryIfMissing True path
@@ -269,6 +284,7 @@ processXml cs =
 
 -- ---------------------------------------------------------------------
 
+renderBody :: t -> (t1, [Confluence]) -> String
 renderBody m (_,(Properties props:Collections collections:rest)) = 
   let
     [StringData body] = props Map.! "body"
@@ -277,6 +293,10 @@ renderBody m (_,(Properties props:Collections collections:rest)) =
 
 -- ---------------------------------------------------------------------
 
+renderPage
+  :: Map.Map Integer (t1, [Confluence])
+     -> (t, [Confluence])
+     -> (String, String)
 renderPage m (_,(Properties props:Collections collections:rest)) = 
   let
     [StringData title] = props Map.! "title"
@@ -287,6 +307,8 @@ renderPage m (_,(Properties props:Collections collections:rest)) =
 
 -- ---------------------------------------------------------------------
 
+extractDates
+  :: Integer -> (t1, [Confluence]) -> (String, String, String, Integer)
 extractDates (-1) _ = ("","","",-1) 
 extractDates oid (_,(Properties props:Collections collections:rest)) = 
   let
@@ -298,6 +320,10 @@ extractDates oid (_,(Properties props:Collections collections:rest)) =
 
 -- ---------------------------------------------------------------------
 
+groupByChangeSet
+  :: Map.Map [Char] [([Char], t, t1, t2)]
+     -> ([Char], t, t1, t2)
+     -> Map.Map [Char] [([Char], t, t1, t2)]
 groupByChangeSet m r@("",_,_,_) = m
 groupByChangeSet m r@(lastModificationDate,lastModifierName,creationDate,oid)
   | Map.member lastModificationDate m = Map.insert lastModificationDate (r:(m Map.! lastModificationDate)) m
@@ -305,12 +331,24 @@ groupByChangeSet m r@(lastModificationDate,lastModifierName,creationDate,oid)
 
 -- ---------------------------------------------------------------------
 
-getProp k m = val
-  where
-    [(StringData val)] = m Map.! k
-
+getProp :: (Ord k) => k -> Map.Map k [Confluence] -> String
+getProp k m = 
+  let
+    v = if (Map.member k m) then (m Map.! k) else [(StringData "")]
+  in
+    case v of
+      [(StringData val)] -> val
+      _                  -> ""
+   
 -- ---------------------------------------------------------------------
     
+renderObject
+  :: Map.Map Integer (t1, [Confluence])
+     -> [Char]
+     -> Map.Map [Char] [Confluence]
+     -> Map.Map [Char] [Confluence]
+     -> t
+     -> Change
 renderObject m "SpaceDescription" props collections rest = (ChOther, "", "SpaceDescription:ignore")
 {-
   [Properties (fromList 
@@ -337,6 +375,7 @@ renderObject m "SpacePermission" props collections rest = (ChOther, "","SpacePer
 renderObject m "Page" props collections rest = 
   let
     title = (getProp "title" props)
+
     -- "position" property? Empty list.
     -- [CollectionElement "bodyContent" (Id bodyId)] = collections Map.! "bodyContents"
     [CollectionElement _ (Id bodyId)] = collections Map.! "bodyContents"
@@ -360,6 +399,8 @@ renderObject m name props collections rest = (ChOther, name,name)
   ("versionComment",[StringData ""])
 -}
 
+getVersionInfo
+  :: Map.Map String [Confluence] -> VersionInfo
 getVersionInfo props =
   let
     contentStatus        = getProp "contentStatus" props
@@ -371,36 +412,56 @@ getVersionInfo props =
     version              = getProp "version" props
     versionComment       = getProp "versionComment" props
   in    
-    (lastModifierName,versionComment,lastModificationDate ++ version)
+    (lastModifierName,lastModificationDate,versionComment,lastModificationDate ++ version)
+    -- (lastModifierName,"",lastModificationDate ++ version)
     
+getVersionForOid
+  :: (Ord k) =>
+     Map.Map k (t, [Confluence]) -> k -> VersionInfo
+getVersionForOid m oid =
+  let
+    (name, (Properties props:Collections collections:rest)) = m Map.! oid
+  in  
+    getVersionInfo props
+
 -- ---------------------------------------------------------------------
 
+renderOid
+  :: Map.Map Integer ([Char], [Confluence])
+     -> Integer
+     -> Change
 renderOid m oid = 
   let
     (name, (Properties props:Collections collections:rest)) = m Map.! oid
-    
   in  
    --(oid,renderObject m name props collections rest)
    renderObject m name props collections rest
 
 -- ---------------------------------------------------------------------
 
+generateChange
+  :: (Ord k) =>
+     Map.Map Integer ([Char], [Confluence])
+     -> Map.Map k [(t, t1, t2, Integer)]
+     -> k
+     -> (VersionInfo, [(ChangeType, String, String)])
 generateChange m changes key =
   let
     changeset = changes Map.! key
     changeIds = map (\(_,_,_,oid) -> oid) changeset
+    version = getVersionForOid m (head changeIds)
   in  
-    filter (\(chType,filename,body) -> filename /= "") $ map (renderOid m) changeIds
+    (version,filter (\(chType,filename,body) -> filename /= "") $ map (renderOid m) changeIds)
 
 -- ---------------------------------------------------------------------
 
-doProcess :: [Content] -> [[(Change, [Char], [Char])]]
+doProcess :: [Content] -> [(VersionInfo,[(ChangeType, [Char], [Char])])]
 doProcess cs = 
   let
     (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
     pages' = filter (\oid -> livePage m oid) pages
     changes = foldl' groupByChangeSet Map.empty $ map (\(k,v) -> extractDates k v) $ Map.toList m
-    res = filter (\xs -> xs /= []) $ map (generateChange m changes) $ Map.keys changes
+    res = filter (\(v,xs) -> xs /= []) $ map (generateChange m changes) $ Map.keys changes
   in  
     --map (renderPage m) $ map (\oid -> m Map.! oid) pages'
     --map (\oid -> m Map.! oid) pages'
