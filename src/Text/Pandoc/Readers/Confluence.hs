@@ -122,6 +122,13 @@ generateFile cfg path (ChPage,filename,body) =
     runGit cfg (add [fullfilename])
     return True
 
+generateFile cfg path (ChAttachment,filename,body) = 
+  do
+    let fullfilename = path ++ "/" ++ filename 
+    writeFile fullfilename body
+    runGit cfg (add [fullfilename])
+    return True
+
 generateFile cfg path change = do return False
  
 -- ---------------------------------------------------------------------
@@ -338,7 +345,8 @@ getProp k m =
   in
     case v of
       [(StringData val)] -> val
-      _                  -> ""
+      [(Id val)]         -> show(val)
+      _                  -> show(v)
    
 -- ---------------------------------------------------------------------
     
@@ -347,7 +355,7 @@ renderObject
      -> [Char]
      -> Map.Map [Char] [Confluence]
      -> Map.Map [Char] [Confluence]
-     -> t
+     -> [Confluence]
      -> Change
 renderObject m "SpaceDescription" props collections rest = (ChOther, "", "SpaceDescription:ignore")
 {-
@@ -383,7 +391,37 @@ renderObject m "Page" props collections rest =
     pageBody = renderBody m (m Map.! bodyId)
     
   in         
-    (ChPage, title,show(pageBody))
+    (ChPage,title,show(pageBody))
+
+{-
+<object class="Attachment" package="com.atlassian.confluence.pages">
+<id name="id">7077889</id>
+<property name="fileName"><![CDATA[20091211238.jpg]]></property>
+<property name="contentType"><![CDATA[image/jpeg]]></property>
+<property name="content" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
+</property>
+<property name="creatorName"><![CDATA[alanz]]></property>
+<property name="creationDate">2011-03-14 20:28:54.777</property>
+<property name="lastModifierName"><![CDATA[alanz]]></property>
+<property name="lastModificationDate">2011-03-14 20:28:54.777</property>
+<property name="fileSize">642789</property>
+<property name="comment"/><property name="attachmentVersion">1</property>
+</object>
+-}
+renderObject m "Attachment" props collections rest = 
+  let
+    fileName          = (getProp "fileName" props)
+    contentId         = (getProp "content" props)
+    attachmentVersion = (getProp "attachmentVersion" props) 
+
+    [(Id oid)] = rest
+    
+    entrypath = "attachments/"++contentId++"/"++show(oid)++"/"++attachmentVersion
+    
+    pageBody = entrypath
+    
+  in         
+    (ChAttachment,fileName,pageBody)
 
 renderObject m name props collections rest = (ChOther, name,name)
 
@@ -455,10 +493,14 @@ generateChange m changes key =
 
 -- ---------------------------------------------------------------------
 
+extractPages cs = foldl' buildStructure (Map.empty,[]) $ processXml cs
+
+
 doProcess :: [Content] -> [(VersionInfo,[(ChangeType, [Char], [Char])])]
 doProcess cs = 
   let
-    (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
+    -- (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
+    (m,pages) = extractPages cs
     pages' = filter (\oid -> livePage m oid) pages
     changes = foldl' groupByChangeSet Map.empty $ map (\(k,v) -> extractDates k v) $ Map.toList m
     res = filter (\(v,xs) -> xs /= []) $ map (generateChange m changes) $ Map.keys changes
@@ -551,7 +593,28 @@ _page =
 
 
 tXml :: [Content]
-tXml = parseXML _test_str
+tXml = parseXML _test_str2
+
+
+_test_str2 :: [Char]
+_test_str2 = 
+  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" ++
+  "<hibernate-generic datetime=\"2011-03-07 16:45:43\">\n" ++
+  "<object class=\"Attachment\" package=\"com.atlassian.confluence.pages\">\n" ++
+  "<id name=\"id\">7077889</id>\n" ++
+  "<property name=\"fileName\"><![CDATA[20091211238.jpg]]></property>\n" ++
+  "<property name=\"contentType\"><![CDATA[image/jpeg]]></property>\n" ++
+  "<property name=\"content\" class=\"Page\" package=\"com.atlassian.confluence.pages\"><id name=\"id\">6914050</id>\n" ++
+  "</property>\n" ++
+  "<property name=\"creatorName\"><![CDATA[alanz]]></property>\n" ++
+  "<property name=\"creationDate\">2011-03-14 20:28:54.777</property>\n" ++
+  "<property name=\"lastModifierName\"><![CDATA[alanz]]></property>\n" ++
+  "<property name=\"lastModificationDate\">2011-03-14 20:28:54.777</property>\n" ++
+  "<property name=\"fileSize\">642789</property>\n" ++
+  "<property name=\"comment\"/><property name=\"attachmentVersion\">1</property>\n" ++
+  "</object>\n" ++
+  "</hibernate-generic>"
+
 
 _test_str :: [Char]
 _test_str = 
