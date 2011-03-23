@@ -38,7 +38,7 @@ readConfluenceFile filename =
   do 
     x <- readFile (filename)
     let changes = doProcess $ parseXML x
-    makeGitVersion changes "/tmp/flub"    
+    makeGitVersion emptyArchive changes "/tmp/flub"    
     return changes    
      
 -- e.g. readConfluenceZip "tests/CONFLUENCE.zip"
@@ -50,7 +50,7 @@ readConfluenceZip filename =
     exists <- doesFileExist filename
     archive <- toArchive <$> B.readFile filename
     let changes = doProcess $ parseXML $ getFileFromArchive archive "entities.xml"
-    makeGitVersion changes "/tmp/flub"    
+    makeGitVersion archive changes "/tmp/flub"    
     return changes    
 
 -- ---------------------------------------------------------------------
@@ -114,30 +114,31 @@ unescapeStr str = read str
 -- ---------------------------------------------------------------------
 
 --generateFile :: Config -> String -> (ChangeType, String, String) -> IO ()
-generateFile :: Config -> String -> (ChangeType, String, String) -> IO Bool
-generateFile cfg path (ChPage,filename,body) = 
+generateFile :: Archive -> Config -> String -> (ChangeType, String, String) -> IO Bool
+generateFile archive cfg path (ChPage,filename,body) = 
   do
     let fullfilename = path ++ "/" ++ filename ++ ".textile"
     writeFile fullfilename (unescapeStr body)
     runGit cfg (add [fullfilename])
     return True
 
-generateFile cfg path (ChAttachment,filename,body) = 
+generateFile archive cfg path (ChAttachment,filename,filepath) = 
   do
     let fullfilename = path ++ "/" ++ filename 
-    writeFile fullfilename body
+    let body = getFileFromArchive archive filepath   
+    B.writeFile fullfilename body
     runGit cfg (add [fullfilename])
     return True
 
-generateFile cfg path change = do return False
+generateFile archive cfg path change = do return False
  
 -- ---------------------------------------------------------------------
 
 foldGenerateFile
-  :: Config -> String -> Bool -> (ChangeType, String, String) -> IO Bool
-foldGenerateFile cfg path acc change =
+  :: Archive -> Config -> String -> Bool -> (ChangeType, String, String) -> IO Bool
+foldGenerateFile archive cfg path acc change =
   do
-    doCommit <- generateFile cfg path change
+    doCommit <- generateFile archive cfg path change
     return (doCommit || acc)
 
 -- ---------------------------------------------------------------------
@@ -149,10 +150,10 @@ commitIfNecessary False _cmd =         return ()
 -- ---------------------------------------------------------------------
 
 doOneGitChange
-  :: Config -> String -> (VersionInfo,[(ChangeType, String, String)]) -> IO [()]
-doOneGitChange cfg path (version,changeSet) = 
+  :: Archive -> Config -> String -> (VersionInfo,[(ChangeType, String, String)]) -> IO [()]
+doOneGitChange archive cfg path (version,changeSet) = 
   do
-    doCommit <- foldlM (foldGenerateFile cfg path) False changeSet
+    doCommit <- foldlM (foldGenerateFile archive cfg path) False changeSet
     let author_email = "author@example.com"
     let (author,date,logmsg,versionid) = version    
     commitIfNecessary doCommit (runGit cfg (commit [] author author_email (logmsg++versionid) ["--date",date]))
@@ -161,15 +162,15 @@ doOneGitChange cfg path (version,changeSet) =
   
 -- ---------------------------------------------------------------------
 
-makeGitVersion :: [(VersionInfo,[Change])] -> FilePath -> IO ()
-makeGitVersion changes path = 
+makeGitVersion :: Archive -> [(VersionInfo,[Change])] -> FilePath -> IO ()
+makeGitVersion archive changes path = 
   do
     createDirectoryIfMissing True path
     
     let cfg = makeConfig path Nothing
     runGit cfg (initDB False)
     
-    mapM (doOneGitChange cfg path) changes
+    mapM (doOneGitChange archive cfg path) changes
 
     return ()
     
