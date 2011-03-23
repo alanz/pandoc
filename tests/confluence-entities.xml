@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<hibernate-generic datetime="2011-03-14 20:34:23">
+<hibernate-generic datetime="2011-03-23 21:52:29">
 <object class="ConfluenceBandanaRecord" package="com.atlassian.confluence.setup.bandana">
 <id name="id">7045121</id>
 <property name="context"><![CDATA[PLAY1]]></property>
@@ -65,23 +65,33 @@
 <collection name="bodyContents" class="java.util.Collection"><element class="BodyContent" package="com.atlassian.confluence.core"><id name="id">6979586</id>
 </element>
 </collection>
-<collection name="outgoingLinks" class="java.util.Collection"><element class="OutgoingLink" package="com.atlassian.confluence.links"><id name="id">7110659</id>
+<collection name="outgoingLinks" class="java.util.Collection"><element class="OutgoingLink" package="com.atlassian.confluence.links"><id name="id">7110661</id>
 </element>
-<element class="OutgoingLink" package="com.atlassian.confluence.links"><id name="id">7110660</id>
+<element class="OutgoingLink" package="com.atlassian.confluence.links"><id name="id">7110662</id>
 </element>
 </collection>
-<property name="version">3</property>
+<property name="version">4</property>
 <property name="creatorName"><![CDATA[alanz]]></property>
 <property name="creationDate">2011-03-14 20:25:24.676</property>
 <property name="lastModifierName"><![CDATA[alanz]]></property>
-<property name="lastModificationDate">2011-03-14 20:33:49.726</property>
-<property name="versionComment"/><collection name="historicalVersions" class="java.util.Collection"><element class="Page" package="com.atlassian.confluence.pages"><id name="id">6914056</id>
+<property name="lastModificationDate">2011-03-23 21:52:04.943</property>
+<property name="versionComment"><![CDATA[Made the image smaller]]></property>
+<collection name="historicalVersions" class="java.util.Collection"><element class="Page" package="com.atlassian.confluence.pages"><id name="id">6914056</id>
 </element>
 <element class="Page" package="com.atlassian.confluence.pages"><id name="id">6914052</id>
 </element>
+<element class="Page" package="com.atlassian.confluence.pages"><id name="id">6914058</id>
+</element>
 </collection>
 <property name="contentStatus"><![CDATA[current]]></property>
-<collection name="attachments" class="java.util.Collection"><element class="Attachment" package="com.atlassian.confluence.pages"><id name="id">7077889</id>
+<collection name="attachments" class="java.util.Collection"><element class="Attachment" package="com.atlassian.confluence.pages"><id name="id">7077890</id>
+</element>
+<element class="Attachment" package="com.atlassian.confluence.pages"><id name="id">7077889</id>
+</element>
+</collection>
+<collection name="labellings" class="java.util.Collection"><element class="Labelling" package="com.atlassian.confluence.labels"><id name="id">7176193</id>
+</element>
+<element class="Labelling" package="com.atlassian.confluence.labels"><id name="id">7176194</id>
 </element>
 </collection>
 </object>
@@ -209,17 +219,6 @@ go&nbsp;[PLAY1:Home]]]></property>
 </property>
 </object>
 <object class="OutgoingLink" package="com.atlassian.confluence.links">
-<id name="id">7110659</id>
-<property name="destinationPageTitle"><![CDATA[sub page 1]]></property>
-<property name="destinationSpaceKey"><![CDATA[PLAY1]]></property>
-<property name="sourceContent" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
-</property>
-<property name="creatorName"><![CDATA[alanz]]></property>
-<property name="creationDate">2011-03-14 20:33:49.733</property>
-<property name="lastModifierName"><![CDATA[alanz]]></property>
-<property name="lastModificationDate">2011-03-14 20:33:49.733</property>
-</object>
-<object class="OutgoingLink" package="com.atlassian.confluence.links">
 <id name="id">7110658</id>
 <property name="destinationPageTitle"><![CDATA[Home]]></property>
 <property name="destinationSpaceKey"><![CDATA[PLAY1]]></property>
@@ -231,15 +230,35 @@ go&nbsp;[PLAY1:Home]]]></property>
 <property name="lastModificationDate">2011-03-14 20:33:08.192</property>
 </object>
 <object class="OutgoingLink" package="com.atlassian.confluence.links">
-<id name="id">7110660</id>
-<property name="destinationPageTitle"><![CDATA[//github.com]]></property>
-<property name="destinationSpaceKey"><![CDATA[http]]></property>
+<id name="id">7110661</id>
+<property name="destinationPageTitle"><![CDATA[sub page 1]]></property>
+<property name="destinationSpaceKey"><![CDATA[PLAY1]]></property>
 <property name="sourceContent" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
 </property>
 <property name="creatorName"><![CDATA[alanz]]></property>
-<property name="creationDate">2011-03-14 20:33:49.733</property>
+<property name="creationDate">2011-03-23 21:52:04.989</property>
 <property name="lastModifierName"><![CDATA[alanz]]></property>
-<property name="lastModificationDate">2011-03-14 20:33:49.733</property>
+<property name="lastModificationDate">2011-03-23 21:52:04.989</property>
+</object>
+<object class="Labelling" package="com.atlassian.confluence.labels">
+<id name="id">7176193</id>
+<property name="label" class="Label" package="com.atlassian.confluence.labels"><id name="id">7143425</id>
+</property>
+<property name="content" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
+</property>
+<property name="user"><![CDATA[alanz]]></property>
+<property name="creationDate">2011-03-23 21:52:04.637</property>
+<property name="lastModificationDate">2011-03-23 21:52:04.637</property>
+</object>
+<object class="Labelling" package="com.atlassian.confluence.labels">
+<id name="id">7176194</id>
+<property name="label" class="Label" package="com.atlassian.confluence.labels"><id name="id">7143426</id>
+</property>
+<property name="content" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
+</property>
+<property name="user"><![CDATA[alanz]]></property>
+<property name="creationDate">2011-03-23 21:52:04.943</property>
+<property name="lastModificationDate">2011-03-23 21:52:04.943</property>
 </object>
 <object class="BodyContent" package="com.atlassian.confluence.core">
 <id name="id">6979586</id>
@@ -258,7 +277,9 @@ Go to sub page :&nbsp;[PLAY1:sub page 1]
 
 [github|http://github.com]
 
+
 !20091211238.jpg|border=1!
+
 
 This is the home of the Play space.
 
@@ -390,6 +411,22 @@ h6. Navigate space
 <property name="creationDate">2011-03-14 20:25:24.741</property>
 <property name="lastModifierName"><![CDATA[alanz]]></property>
 <property name="lastModificationDate">2011-03-14 20:25:24.741</property>
+</object>
+<object class="Page" package="com.atlassian.confluence.pages">
+<id name="id">6914058</id>
+<property name="position"/><property name="title"><![CDATA[Home]]></property>
+<collection name="bodyContents" class="java.util.Collection"><element class="BodyContent" package="com.atlassian.confluence.core"><id name="id">6979594</id>
+</element>
+</collection>
+<property name="version">3</property>
+<property name="creatorName"><![CDATA[alanz]]></property>
+<property name="creationDate">2011-03-14 20:25:24.676</property>
+<property name="lastModifierName"><![CDATA[alanz]]></property>
+<property name="lastModificationDate">2011-03-14 20:33:49.726</property>
+<property name="versionComment"><![CDATA[]]></property>
+<property name="originalVersion" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
+</property>
+<property name="contentStatus"><![CDATA[current]]></property>
 </object>
 <object class="Page" package="com.atlassian.confluence.pages">
 <id name="id">6914056</id>
@@ -558,6 +595,21 @@ h6. Navigate space
 <property name="lastModifierName"><![CDATA[alanz]]></property>
 <property name="lastModificationDate">2011-03-14 20:25:24.581</property>
 </object>
+<object class="Attachment" package="com.atlassian.confluence.pages">
+<id name="id">7077890</id>
+<property name="fileName"><![CDATA[20091211238.jpg]]></property>
+<property name="contentType"><![CDATA[image/jpeg]]></property>
+<property name="content" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
+</property>
+<property name="creatorName"><![CDATA[alanz]]></property>
+<property name="creationDate">2011-03-14 20:28:54.777</property>
+<property name="lastModifierName"><![CDATA[alanz]]></property>
+<property name="lastModificationDate">2011-03-14 20:28:54.777</property>
+<property name="fileSize">642789</property>
+<property name="comment"/><property name="attachmentVersion">1</property>
+<property name="originalVersion" class="Attachment" package="com.atlassian.confluence.pages"><id name="id">7077889</id>
+</property>
+</object>
 <object class="SpacePermission" package="com.atlassian.confluence.security">
 <id name="id">7012373</id>
 <property name="space" class="Space" package="com.atlassian.confluence.spaces"><id name="id">6946817</id>
@@ -575,11 +627,11 @@ h6. Navigate space
 <property name="content" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
 </property>
 <property name="creatorName"><![CDATA[alanz]]></property>
-<property name="creationDate">2011-03-14 20:28:54.777</property>
+<property name="creationDate">2011-03-23 21:50:26.406</property>
 <property name="lastModifierName"><![CDATA[alanz]]></property>
-<property name="lastModificationDate">2011-03-14 20:28:54.777</property>
-<property name="fileSize">642789</property>
-<property name="comment"/><property name="attachmentVersion">1</property>
+<property name="lastModificationDate">2011-03-23 21:50:26.406</property>
+<property name="fileSize">28325</property>
+<property name="comment"/><property name="attachmentVersion">2</property>
 </object>
 <object class="SpacePermission" package="com.atlassian.confluence.security">
 <id name="id">7012370</id>
@@ -761,6 +813,17 @@ h6. Navigate space
 <property name="lastModifierName"><![CDATA[alanz]]></property>
 <property name="lastModificationDate">2011-03-14 20:25:24.623</property>
 </object>
+<object class="OutgoingLink" package="com.atlassian.confluence.links">
+<id name="id">7110662</id>
+<property name="destinationPageTitle"><![CDATA[//github.com]]></property>
+<property name="destinationSpaceKey"><![CDATA[http]]></property>
+<property name="sourceContent" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914050</id>
+</property>
+<property name="creatorName"><![CDATA[alanz]]></property>
+<property name="creationDate">2011-03-23 21:52:04.989</property>
+<property name="lastModifierName"><![CDATA[alanz]]></property>
+<property name="lastModificationDate">2011-03-23 21:52:04.989</property>
+</object>
 <object class="SpacePermission" package="com.atlassian.confluence.security">
 <id name="id">7012353</id>
 <property name="space" class="Space" package="com.atlassian.confluence.spaces"><id name="id">6946817</id>
@@ -881,6 +944,44 @@ h6. Navigate space
 </property>
 </object>
 <object class="BodyContent" package="com.atlassian.confluence.core">
+<id name="id">6979594</id>
+<property name="body"><![CDATA[For testing export
+
+* Unordered list item 1
+* item 2
+* item 3
+
+# Ordered list item 1
+# item 2 ol
+# third ordered one
+
+Go to sub page :&nbsp;[PLAY1:sub page 1]
+
+
+[github|http://github.com]
+
+!20091211238.jpg|border=1!
+
+This is the home of the Play space.
+
+To help you on your way, we've inserted some of our favourite macros on this home page. As you start creating pages, adding news items and commenting you'll see the macros below fill up with all the activity in your space.
+{section}
+{column:width=60%}
+{recently-updated}
+{column}
+{column:width=5%}
+{column}
+{column:width=35%}
+
+h6. Navigate space
+{pagetreesearch}
+{pagetree}
+{column}
+{section}]]></property>
+<property name="content" class="Page" package="com.atlassian.confluence.pages"><id name="id">6914058</id>
+</property>
+</object>
+<object class="BodyContent" package="com.atlassian.confluence.core">
 <id name="id">6979592</id>
 <property name="body"><![CDATA[For testing export
 
@@ -921,6 +1022,20 @@ h6. Navigate space
 <property name="content" class="SpaceDescription" package="com.atlassian.confluence.spaces"><id name="id">6914049</id>
 </property>
 </object>
+<object class="Label" package="com.atlassian.confluence.labels">
+<id name="id">7143425</id>
+<property name="name"><![CDATA[label1]]></property>
+<property name="owner"/><property name="namespace"><![CDATA[global]]></property>
+<property name="creationDate">2011-03-23 21:52:04.633</property>
+<property name="lastModificationDate">2011-03-23 21:52:04.633</property>
+</object>
+<object class="Label" package="com.atlassian.confluence.labels">
+<id name="id">7143426</id>
+<property name="name"><![CDATA[label2]]></property>
+<property name="owner"/><property name="namespace"><![CDATA[global]]></property>
+<property name="creationDate">2011-03-23 21:52:04.942</property>
+<property name="lastModificationDate">2011-03-23 21:52:04.942</property>
+</object>
 <object class="BucketPropertySetItem" package="bucket.user.propertyset">
 <composite-id><property name="entityName" type="string"><![CDATA[confluence_ContentEntityObject]]></property>
 <property name="entityId" type="long">6914050</property>
@@ -940,7 +1055,8 @@ h6. Navigate space
 <property name="type">5</property>
 <property name="booleanVal">false</property>
 <property name="doubleVal">0.0</property>
-<property name="stringVal"/><property name="textVal"/><property name="longVal">0</property>
+<property name="stringVal"/><property name="textVal"><![CDATA[]]></property>
+<property name="longVal">0</property>
 <property name="intVal">0</property>
 <property name="dateVal"/></object>
 </hibernate-generic>

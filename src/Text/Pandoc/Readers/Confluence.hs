@@ -50,7 +50,7 @@ readConfluenceZip filename =
     exists <- doesFileExist filename
     archive <- toArchive <$> B.readFile filename
     let changes = doProcess $ parseXML $ getFileFromArchive archive "entities.xml"
-    makeGitVersion archive changes "/tmp/flub"    
+    -- makeGitVersion archive changes "/tmp/flub"    
     return changes    
 
 -- ---------------------------------------------------------------------
@@ -500,7 +500,6 @@ extractPages cs = foldl' buildStructure (Map.empty,[]) $ processXml cs
 doProcess :: [Content] -> [(VersionInfo,[(ChangeType, [Char], [Char])])]
 doProcess cs = 
   let
-    -- (m,pages) = foldl' buildStructure (Map.empty,[]) $ processXml cs
     (m,pages) = extractPages cs
     pages' = filter (\oid -> livePage m oid) pages
     changes = foldl' groupByChangeSet Map.empty $ map (\(k,v) -> extractDates k v) $ Map.toList m
@@ -545,6 +544,10 @@ handleObject (_,oid,"Page",contents)                    = ("Page",oid, collectNa
 handleObject (_,oid,"Space",contents)                   = ("Space",oid, collectNames contents)
 handleObject (_,oid,"SpacePermission",contents)         = ("SpacePermission",oid, collectNames contents)
 handleObject (_,oid,"SpaceDescription",contents)        = ("SpaceDescription",oid, collectNames contents)
+handleObject (_,oid,"Labelling",contents)               = ("Labelling",oid, collectNames contents)
+handleObject (_,oid,"Label",contents)                   = ("Label",oid, collectNames contents)
+
+handleObject (_,oid,name,contents)                      = ("***" ++ name,oid, collectNames contents)
 
 -- ---------------------------------------------------------------------
 
@@ -569,10 +572,19 @@ collectNames cs =
 -- =====================================================================
 -- Testing support
 
+parseXmlFile filename =
+  do 
+    x <- readFile (filename)
+    let xml = parseXML x
+    let (m,pages) = extractPages xml    
+    return pages
+
+x = parseXmlFile "tests/confluence-entities.xml"
+
 t = readConfluenceFile "tests/confluence-entities.xml"
 
-z = readConfluenceZip "/home/alanz/tmp/PLAY1-203424-2.xml.zip"
-
+--z = readConfluenceZip "/home/alanz/tmp/PLAY1-203424-2.xml.zip"
+z = readConfluenceZip "/home/alanz/tmp/PLAY1-215229-4.xml.zip"
 
 _page :: [Confluence]
 _page =   
