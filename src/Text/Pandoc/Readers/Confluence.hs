@@ -50,7 +50,7 @@ readConfluenceZip filename =
     exists <- doesFileExist filename
     archive <- toArchive <$> B.readFile filename
     let changes = doProcess $ parseXML $ getFileFromArchive archive "entities.xml"
-    -- makeGitVersion archive changes "/tmp/flub"    
+    makeGitVersion archive changes "/tmp/flub"    
     return changes    
 
 -- ---------------------------------------------------------------------
@@ -450,8 +450,10 @@ getVersionInfo props =
     originalVersion      = getProp "originalVersion" props
     version              = getProp "version" props
     versionComment       = getProp "versionComment" props
+    user                 = getProp "user" props
+    committer = if (lastModifierName /= "") then lastModifierName else user
   in    
-    (lastModifierName,lastModificationDate,versionComment,lastModificationDate ++ version)
+    (committer,lastModificationDate,versionComment,lastModificationDate ++ version)
     -- (lastModifierName,"",lastModificationDate ++ version)
     
 getVersionForOid
@@ -585,6 +587,7 @@ t = readConfluenceFile "tests/confluence-entities.xml"
 
 --z = readConfluenceZip "/home/alanz/tmp/PLAY1-203424-2.xml.zip"
 z = readConfluenceZip "/home/alanz/tmp/PLAY1-215229-4.xml.zip"
+
 
 _page :: [Confluence]
 _page =   
